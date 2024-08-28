@@ -1,0 +1,58 @@
+DeepTrader: Reinforcement Learning for Forex Trading
+This code implements a sophisticated reinforcement learning system for forex trading, particularly focused on the GBPAUD currency pair. Here's an overview of what the system does:
+Key Components
+
+Custom Environment (DeepTraderEnv)
+
+Simulates a forex trading environment
+Handles data preprocessing, including technical indicators
+Manages trade execution and reward calculation
+
+
+Neural Network Architecture
+
+Uses a custom CNN-based feature extractor
+Implements a custom actor-critic policy network
+
+
+PPO (Proximal Policy Optimization) Algorithm
+
+Utilizes the Stable Baselines3 implementation of PPO
+Customized for forex trading with specific hyperparameters
+
+
+Data Handling and Preprocessing
+
+Fetches historical forex data using yfinance
+Calculates various technical indicators (RSI, MACD, Bollinger Bands, etc.)
+
+
+Training Pipeline
+
+Implements a complete training loop with evaluation callbacks
+Uses TensorBoard for logging and visualization
+
+
+Backtesting and Analysis
+
+Includes functions for backtesting the trained model
+Provides analysis of backtest results (win rate, total return, etc.)
+Visualizes backtest results using Plotly
+
+
+
+Workflow
+
+Data is fetched and preprocessed
+The trading environment is created
+The model is trained using PPO
+The trained model is evaluated and saved
+A backtest is performed on historical data
+Results are analyzed and visualized
+
+Key Features
+
+Continuous action space for flexible trade decisions
+Integration of multiple technical indicators
+Custom reward function based on risk-reward ratio
+Visualization of individual trades and overall performance

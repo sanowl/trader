@@ -30,7 +30,7 @@ class TradeInfo:
     sl: float
     rr_ratio: float
 
-class AdvancedFeatureExtractor(nn.Module):
+class FeatureExtractor(nn.Module):
     def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 64):
         super().__init__()
         n_input_channels = observation_space.shape[1]
@@ -87,10 +87,10 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         self._build_mlp_extractor()
 
     def _build_mlp_extractor(self) -> None:
-        self.features_extractor = AdvancedFeatureExtractor(self.observation_space)
+        self.features_extractor = FeatureExtractor(self.observation_space)
         self.mlp_extractor = CustomNetwork(64, self.action_space.shape[0], 1)
 
-class AdvancedDeepTraderEnv(gym.Env):
+class DeepTraderEnv(gym.Env):
     def __init__(self, data: pd.DataFrame, num_candles: int = 300, render_mode: str = None):
         super().__init__()
         self.render_mode = render_mode
@@ -255,7 +255,7 @@ class TensorboardCallback(BaseCallback):
         return True
 
 def create_env(data: pd.DataFrame, render_mode: str = None) -> gym.Env:
-    return Monitor(AdvancedDeepTraderEnv(data, render_mode=render_mode))
+    return Monitor(DeepTraderEnv(data, render_mode=render_mode))
 
 def train_model(data: pd.DataFrame, total_timesteps: int = 1000000) -> PPO:
     env = DummyVecEnv([lambda: create_env(data)])
@@ -361,7 +361,7 @@ if __name__ == "__main__":
     data = yf.Ticker(ticker_symbol).history(period="2y", interval="1h")
 
     model = train_model(data)
-    model.save("advanced_ppo_deep_trader_final")
+    model.save("ppo_deep_trader_final")
 
     mean_reward, std_reward = evaluate_policy(model, create_env(data), n_eval_episodes=10)
     logger.info(f"Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}")
