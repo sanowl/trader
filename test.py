@@ -33,7 +33,7 @@ class TradeInfo:
 class FeatureExtractor(nn.Module):
     def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 64):
         super().__init__()
-        n_input_channels = observation_space.shape[1]
+        n_input_channels = observation_space.shape[0]  # Changed from [1] to [0]
         self.cnn = nn.Sequential(
             nn.Conv1d(n_input_channels, 32, kernel_size=8, stride=4, padding=2),
             nn.ReLU(),
@@ -41,25 +41,25 @@ class FeatureExtractor(nn.Module):
             nn.ReLU(),
             nn.Flatten(),
         )
-        
+
         # Compute shape by doing one forward pass
         with torch.no_grad():
-            n_flatten = self.cnn(torch.as_tensor(observation_space.sample()[None]).float().transpose(1, 2)).shape[1]
-        
+            n_flatten = self.cnn(torch.as_tensor(observation_space.sample()[None]).float()).shape[1]
+
         self.linear = nn.Sequential(
             nn.Linear(n_flatten, features_dim),
             nn.ReLU()
         )
-        
+
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
-        return self.linear(self.cnn(observations.transpose(1, 2)))
+        return self.linear(self.cnn(observations))
 
 class CustomNetwork(nn.Module):
     def __init__(self, feature_dim: int, last_layer_dim_pi: int, last_layer_dim_vf: int):
         super().__init__()
         self.latent_dim_pi = last_layer_dim_pi
         self.latent_dim_vf = last_layer_dim_vf
-        
+
         self.policy_net = nn.Sequential(
             nn.Linear(feature_dim, 64),
             nn.ReLU(),
@@ -70,13 +70,13 @@ class CustomNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(64, last_layer_dim_vf)
         )
-        
+
     def forward(self, features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         return self.policy_net(features), self.value_net(features)
-        
+
     def forward_actor(self, features: torch.Tensor) -> torch.Tensor:
         return self.policy_net(features)
-        
+
     def forward_critic(self, features: torch.Tensor) -> torch.Tensor:
         return self.value_net(features)
 
@@ -99,7 +99,7 @@ class DeepTraderEnv(gym.Env):
         self.lookahead_steps = 200
 
         self.action_space = spaces.Box(low=-1, high=1, shape=(4,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.num_candles, 15), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(15, self.num_candles), dtype=np.float32)  # Changed shape
 
         self.scaler = StandardScaler()
         self.reset()
@@ -202,9 +202,9 @@ class DeepTraderEnv(gym.Env):
         df = self.data.iloc[start:end]
 
         obs = df[['Open', 'High', 'Low', 'Close', 'Volume', 'RSI', 'MACD', 'ATR', 'BB_upper', 'BB_middle', 'BB_lower', 'Stoch_K', 'Stoch_D']].values
-        scaled_obs = self.scaler.fit_transform(obs)
+        scaled_obs = self.scaler.fit_transform(obs.T)  # Transpose before scaling
 
-        return np.column_stack([scaled_obs, df.index.astype(int).values.reshape(-1, 1)])
+        return np.vstack([scaled_obs, df.index.astype(int).values])  # Stack vertically
 
     def render(self) -> None:
         if self.current_trade:
@@ -258,12 +258,14 @@ def create_env(data: pd.DataFrame, render_mode: str = None) -> gym.Env:
     return Monitor(DeepTraderEnv(data, render_mode=render_mode))
 
 def train_model(data: pd.DataFrame, total_timesteps: int = 1000000) -> PPO:
+    # Create environments for training and evaluation
     env = DummyVecEnv([lambda: create_env(data)])
     env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.)
 
     eval_env = DummyVecEnv([lambda: create_env(data.copy())])
     eval_env = VecNormalize(eval_env, norm_obs=True, norm_reward=True, clip_obs=10.)
 
+    # Initialize the PPO model
     model = PPO(
         policy=CustomActorCriticPolicy,
         env=env,
@@ -279,6 +281,7 @@ def train_model(data: pd.DataFrame, total_timesteps: int = 1000000) -> PPO:
         tensorboard_log="./ppo_deeptrader_tensorboard/"
     )
 
+    # Define the evaluation callback
     eval_callback = EvalCallback(
         eval_env,
         best_model_save_path='./best_model/',
@@ -288,6 +291,7 @@ def train_model(data: pd.DataFrame, total_timesteps: int = 1000000) -> PPO:
         render=False
     )
 
+    # Train the model
     model.learn(
         total_timesteps=total_timesteps,
         callback=[TensorboardCallback(), eval_callback]
