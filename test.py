@@ -204,7 +204,21 @@ class DeepTraderEnv(gym.Env):
         obs = df[['Open', 'High', 'Low', 'Close', 'Volume', 'RSI', 'MACD', 'ATR', 'BB_upper', 'BB_middle', 'BB_lower', 'Stoch_K', 'Stoch_D']].values
         scaled_obs = self.scaler.fit_transform(obs.T)  # Transpose before scaling
 
-        return np.vstack([scaled_obs, df.index.astype(int).values])  # Stack vertically
+        # Add a row for the time index
+        time_index = (df.index.astype(int).values - df.index[0].astype(int)) / 1e9  # Convert to seconds since start
+        scaled_time = (time_index - np.mean(time_index)) / np.std(time_index)  # Normalize time
+
+        # Stack vertically and ensure 15 rows
+        full_obs = np.vstack([scaled_obs, scaled_time.reshape(1, -1)])
+        
+        # Ensure the observation has exactly 15 rows
+        if full_obs.shape[0] < 15:
+            padding = np.zeros((15 - full_obs.shape[0], full_obs.shape[1]))
+            full_obs = np.vstack([full_obs, padding])
+        elif full_obs.shape[0] > 15:
+            full_obs = full_obs[:15, :]
+
+        return full_obs
 
     def render(self) -> None:
         if self.current_trade:
